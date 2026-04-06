@@ -16,6 +16,11 @@ st.title("pdf QandA with AI")
 uploaded_file = st.sidebar.file_uploader("upload a PDF", type="pdf")
 
 if uploaded_file:
+    
+    if uploaded_file.name != st.session_state.get("name"):
+        if "vector_store" in st.session_state:
+            del st.session_state["vector_store"]
+        st.session_state["name"] = uploaded_file.name
 
     if "vector_store" not in st.session_state:
         # made pdf to one long string
@@ -23,6 +28,9 @@ if uploaded_file:
         text = ""
         for page in reader.pages:
             text += page.extract_text()
+        if not text.strip():
+            st.warning("please input text")
+            st.stop()
     
         #convert that long string to chunks
         splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
@@ -51,35 +59,33 @@ if question:
     st.session_state["messages"].append({"role": "user", "content": question})
     with st.chat_message("user"):
         st.write(question)
+    
+    if "vector_store" not in st.session_state:
+        st.warning("Please uplaod the PDF to start chat")
+    else:
+        # 2. Search, build prompt, call Gemini
+        results = st.session_state["vector_store"].similarity_search(question,k=4)
+        context = "\n---\n".join([r.page_content for r in results])
+        prompt = f"""You are a helpful assistant. Answer the question based ONLY on the following context.
+        If the answer is not in the context, say "I don't have enough information."
 
-    # 2. Search, build prompt, call Gemini
-    results = st.session_state["vector_store"].similarity_search(question,k=4)
-    context = ""
-    for result in results:
-        context += result.page_content + "\n"
-    prompt = f"""You are a helpful assistant. Answer the question based ONLY on the following context.If the answer is not in the context, say "I don't have enough information."
-    Context: {context} Question: {question}"""
-    try:
-        response = client.models.generate_content(model="gemini-flash-latest", contents=prompt)
-        # 3. Save and display assistant message
-        st.session_state["messages"].append({"role": "assistant", "content": response.text})
-        with st.chat_message("assistant"):
-            st.write(response.text)
-    except Exception as e:
-        st.write(f"error: {e}")
-else:
-    st.write("please upload a file to start conversation")
+        Context:
+        {context}
+        
+        Question:
+        {question}
+
+        Answer:"""
+
+        try:
+            response = client.models.generate_content(model="gemini-flash-latest", contents=prompt)
+            # 3. Save and display assistant message
+            st.session_state["messages"].append({"role": "assistant", "content": response.text})
+            with st.chat_message("assistant"):
+                st.write(response.text)
+        except Exception as e:
+            st.write(f"error: {e}")
 
 
         
-
-
-
-
-        
-
-
-    
-    
-
 
