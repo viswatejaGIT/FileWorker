@@ -41,48 +41,55 @@ def extract_and_chunk(uploaded_file):
         st.session_state["vector_store"] = vector_store
 
 
-def processing(question):
-    # 1. Save and display user message
+def processing(question,tempe):
     st.session_state["messages"].append({"role": "user", "content": question})
     with st.chat_message("user"):
         st.write(question)
     
-    if "vector_store" not in st.session_state:
-        st.warning("Please uplaod the PDF to start chat")
-    else:
-        # 2. Search, build prompt, call Gemini
-        results = st.session_state["vector_store"].similarity_search(question,k=4)
-        message = "previous conversation:\n" + "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state["messages"]])
+    message = "previous conversation:\n" + "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state["messages"][-6:]])
+
+    if "vector_store" in st.session_state:
+        results = st.session_state["vector_store"].similarity_search(question, k=4)
         context = "\n---\n".join([r.page_content for r in results])
         prompt = f"""You are a helpful assistant. Answer the question based ONLY on the following context.
         If the answer is not in the context, say "I don't have enough information" and dont say "Based on provided context", just answer the question
 
         Context:
         {context}
-            
+
         chat History for smooth flow of conversation:
         {message}
-           
+
         Question:
         {question}
-        
-        Answer:"""
 
-        try:
-            with st.spinner("Got the content, let me answer now.."):
-                response = client.models.generate_content(model="gemini-flash-latest", contents=prompt)
-                # 3. Save and display assistant message
-                st.session_state["messages"].append({"role": "assistant", "content": response.text})
-                with st.chat_message("assistant"):
-                    st.write(response.text)
+        Answer:"""
+    else:
+        prompt = f"""You are a helpful assistant.
+
+        chat History for smooth flow of conversation:
+        {message}
+
+        Question:
+        {question}
+
+        Answer:"""
+        results = None
+
+    try:
+        with st.spinner("Thinking.."):
+            response = client.models.generate_content(model="gemini-flash-latest", contents=prompt, config={"temperature": tempe})
+            st.session_state["messages"].append({"role": "assistant", "content": response.text})
+            with st.chat_message("assistant"):
+                st.write(response.text)
+            if results:
                 with st.expander("Show thinking"):
                     for r in results:
                         st.write(f"Page {r.metadata['page']}:")
                         st.write(r.page_content)
                         st.write("---")
-
-        except Exception as e:
-            st.write(f"error: {e}")
+    except Exception as e:
+        st.write(f"error: {e}")
 
 
 if __name__ == "__main__":
@@ -90,6 +97,8 @@ if __name__ == "__main__":
     st.title("pdf QandA with AI")
 
     uploaded_file = st.sidebar.file_uploader("upload a PDF", type="pdf")
+    
+    tempe = st.sidebar.select_slider("Response Style", options=["Precise", "Balanced", "Creative"], value="Balanced")
     
     if uploaded_file:
         extract_and_chunk(uploaded_file)
@@ -103,6 +112,5 @@ if __name__ == "__main__":
             st.write(message["content"])
     
     if question:
-        processing(question)
-
-    
+        temp_map = {"Precise": 0.2, "Balanced": 0.5, "Creative": 0.9}
+        processing(question,temp_map[tempe])
