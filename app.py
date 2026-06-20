@@ -41,18 +41,23 @@ def extract_and_chunk(uploaded_file):
         st.session_state["vector_store"] = vector_store
 
 
-def processing(question,tempe):
+def processing(question,style):
     st.session_state["messages"].append({"role": "user", "content": question})
     with st.chat_message("user"):
         st.write(question)
     
     message = "previous conversation:\n" + "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state["messages"][-6:]])
+    detail_map = {
+            "Short": "Keep your answer to 1-2 sentences maximum",
+            "Normal": "Give a clear, appropriately sized answer",
+            "Detailed": "Give a thorough answer with examples and reasoning"
+        }
 
     if "vector_store" in st.session_state:
         results = st.session_state["vector_store"].similarity_search(question, k=4)
-        context = "\n---\n".join([r.page_content for r in results])
+        context = "\n---\n".join([r.page_content for r in results])          
         prompt = f"""You are a helpful assistant. Answer the question based ONLY on the following context.
-        If the answer is not in the context, say "I don't have enough information" and dont say "Based on provided context", just answer the question
+        If the answer is not in the context, say "I don't have enough information" and dont say "Based on provided context", just answer the question in {detail_map[style["output_level"]]} style.
 
         Context:
         {context}
@@ -65,7 +70,7 @@ def processing(question,tempe):
 
         Answer:"""
     else:
-        prompt = f"""You are a helpful assistant.
+        prompt = f"""You are a helpful assistant. just answer question in {detail_map[style["output_level"]]} style.
 
         chat History for smooth flow of conversation:
         {message}
@@ -78,7 +83,7 @@ def processing(question,tempe):
 
     try:
         with st.spinner("Thinking.."):
-            response = client.models.generate_content(model="gemini-flash-latest", contents=prompt, config={"temperature": tempe})
+            response = client.models.generate_content(model="gemini-flash-latest", contents=prompt, config={"temperature": style["temperature"]})
             st.session_state["messages"].append({"role": "assistant", "content": response.text})
             with st.chat_message("assistant"):
                 st.write(response.text)
@@ -98,7 +103,11 @@ if __name__ == "__main__":
 
     uploaded_file = st.sidebar.file_uploader("upload a PDF", type="pdf")
     
-    tempe = st.sidebar.select_slider("Response Style", options=["Precise", "Balanced", "Creative"], value="Balanced")
+    tempe = st.sidebar.radio("Response Style", options=["Precise", "Balanced", "Creative"])
+    temp_map = {"Precise": 0.2, "Balanced": 0.5, "Creative": 0.9}
+    
+    output_level = st.sidebar.radio("Detail level", options=["Short","Normal","Detailed"])
+    style = {"temperature":temp_map[tempe], "output_level": output_level}
     
     if uploaded_file:
         extract_and_chunk(uploaded_file)
@@ -112,5 +121,4 @@ if __name__ == "__main__":
             st.write(message["content"])
     
     if question:
-        temp_map = {"Precise": 0.2, "Balanced": 0.5, "Creative": 0.9}
-        processing(question,temp_map[tempe])
+        processing(question,style)
