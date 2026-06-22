@@ -80,26 +80,32 @@ def processing(question,style):
 
         Answer:"""
         results = None
+    
+
 
     try:
-        with st.spinner("Thinking.."):
-            response = client.models.generate_content(model="gemini-flash-latest", contents=prompt, config={"temperature": style["temperature"]})
-            st.session_state["messages"].append({"role": "assistant", "content": response.text})
-            with st.chat_message("assistant"):
-                st.write(response.text)
-            if results:
-                with st.expander("Show thinking"):
-                    for r in results:
-                        st.write(f"Page {r.metadata['page']}:")
-                        st.write(r.page_content)
-                        st.write("---")
+        stream = client.models.generate_content_stream(model="gemini-flash-latest", contents=prompt, config={"temperature": style["temperature"]})
+        with st.chat_message("assistant"):
+            full_response = ""
+            placeholder = st.empty()
+            for chunk in stream:
+                full_response += chunk.text
+                placeholder.markdown(full_response)
+        st.session_state["messages"].append({"role": "assistant", "content": full_response})
+        
+        if results:
+            with st.expander("Show thinking"):
+                for r in results:
+                    st.write(f"Page {r.metadata['page']}:")
+                    st.write(r.page_content)
+                    st.write("---")
     except Exception as e:
         st.write(f"error: {e}")
 
 
 if __name__ == "__main__":
     
-    st.title("pdf QandA with AI")
+    st.title("chat with AI")
 
     uploaded_file = st.sidebar.file_uploader("upload a PDF", type="pdf")
     
