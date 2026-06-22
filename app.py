@@ -41,55 +41,79 @@ def extract_and_chunk(uploaded_file):
         st.session_state["vector_store"] = vector_store
 
 
-def processing(question):
-    # 1. Save and display user message
+def processing(question,style):
     st.session_state["messages"].append({"role": "user", "content": question})
     with st.chat_message("user"):
         st.write(question)
     
-    if "vector_store" not in st.session_state:
-        st.warning("Please uplaod the PDF to start chat")
-    else:
-        # 2. Search, build prompt, call Gemini
-        results = st.session_state["vector_store"].similarity_search(question,k=4)
-        message = "previous conversation:\n" + "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state["messages"]])
-        context = "\n---\n".join([r.page_content for r in results])
+    message = "previous conversation:\n" + "\n".join([f"{m['role']}: {m['content']}" for m in st.session_state["messages"][-6:]])
+    detail_map = {
+            "Short": "Keep your answer to 1-2 sentences maximum",
+            "Normal": "Give a clear, appropriately sized answer",
+            "Detailed": "Give a thorough answer with examples and reasoning"
+        }
+
+    if "vector_store" in st.session_state:
+        results = st.session_state["vector_store"].similarity_search(question, k=4)
+        context = "\n---\n".join([r.page_content for r in results])          
         prompt = f"""You are a helpful assistant. Answer the question based ONLY on the following context.
-        If the answer is not in the context, say "I don't have enough information" and dont say "Based on provided context", just answer the question
+        If the answer is not in the context, say "I don't have enough information" and dont say "Based on provided context", just answer the question in {detail_map[style["output_level"]]} style.
 
         Context:
         {context}
-            
+
         chat History for smooth flow of conversation:
         {message}
-           
+
         Question:
         {question}
-        
+
         Answer:"""
+    else:
+        prompt = f"""You are a helpful assistant. just answer question in {detail_map[style["output_level"]]} style.
 
-        try:
-            with st.spinner("Got the content, let me answer now.."):
-                response = client.models.generate_content(model="gemini-flash-latest", contents=prompt)
-                # 3. Save and display assistant message
-                st.session_state["messages"].append({"role": "assistant", "content": response.text})
-                with st.chat_message("assistant"):
-                    st.write(response.text)
-                with st.expander("Show thinking"):
-                    for r in results:
-                        st.write(f"Page {r.metadata['page']}:")
-                        st.write(r.page_content)
-                        st.write("---")
+        chat History for smooth flow of conversation:
+        {message}
 
-        except Exception as e:
-            st.write(f"error: {e}")
+        Question:
+        {question}
+
+        Answer:"""
+        results = None
+    
+
+
+    try:
+        stream = client.models.generate_content_stream(model="gemini-flash-latest", contents=prompt, config={"temperature": style["temperature"]})
+        with st.chat_message("assistant"):
+            full_response = ""
+            placeholder = st.empty()
+            for chunk in stream:
+                full_response += chunk.text
+                placeholder.markdown(full_response)
+        st.session_state["messages"].append({"role": "assistant", "content": full_response})
+        
+        if results:
+            with st.expander("Show thinking"):
+                for r in results:
+                    st.write(f"Page {r.metadata['page']}:")
+                    st.write(r.page_content)
+                    st.write("---")
+    except Exception as e:
+        st.write(f"error: {e}")
 
 
 if __name__ == "__main__":
     
-    st.title("pdf QandA with AI")
+    st.title("chat with AI")
 
     uploaded_file = st.sidebar.file_uploader("upload a PDF", type="pdf")
+    
+    tempe = st.sidebar.radio("Response Style", options=["Precise", "Balanced", "Creative"])
+    temp_map = {"Precise": 0.2, "Balanced": 0.5, "Creative": 0.9}
+    
+    output_level = st.sidebar.radio("Detail level", options=["Short","Normal","Detailed"])
+    style = {"temperature":temp_map[tempe], "output_level": output_level}
     
     if uploaded_file:
         extract_and_chunk(uploaded_file)
@@ -103,6 +127,4 @@ if __name__ == "__main__":
             st.write(message["content"])
     
     if question:
-        processing(question)
-
-    
+        processing(question,style)
