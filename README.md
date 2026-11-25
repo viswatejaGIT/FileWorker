@@ -1,21 +1,65 @@
-# Summary of project
-This is a Retrieval Augmented Generation(RAG) based web application where you can upload a pdf(of certain pages, not a book..etc) and ask questions in it like you ask it to someone who read the pdf. you can write the question in chatbox and bot will answer the question and also provides you with the pages it referred to answer the question. try it :)
+# PDF Chat - RAG Chatbot
 
-## features
-- pdf upload
-- chat with conversation memory
-- Page source reference
-- Thinking expander
+A Streamlit-based chatbot that lets you upload PDFs and ask questions about them using Retrieval-Augmented Generation (RAG).
 
-## tech Stack
-Streamlit, Google Gemini, LangChain, FAISS, HuggingFace Embeddings, PyPDF2
+## Features
 
-## How to run locally
-- Clone the repo
-- Install dependencies(in requirements file)
-- Create .env with the API key
-- Run 'streamlit run app.py'
+- **PDF Upload**: Upload any PDF document (up to 10MB)
+- **RAG Pipeline**: Chunks documents, creates embeddings, and retrieves relevant context for answers
+- **Conversational Memory**: Maintains chat history for natural follow-up questions
+- **Customizable Responses**: 
+  - Response Style: Precise / Balanced / Creative (controls temperature)
+  - Detail Level: Short / Normal / Detailed
+- **Source Citations**: "Show thinking" expander reveals which pages were used to answer
 
-## how it works
-As soon as you upload a document, the document is stored locally in your system. then the content in document will be turned to embeddings and stored in FAISS database. when you enter a question, the question will also be converted to embeds and will be matched with the embeds present in the database, then it will take the top 4 best matched embeds to your question, considering this as a context to answer your question, this will be given to gemini llm with a detailed prompt. then LLM process it and produce the output which is shown to you. You can also see the top 4 embed text chosen to answer your question in "show thinking" drop down after the answer.
+## Tech Stack
 
+- **Frontend**: Streamlit
+- **PDF Processing**: PyPDF2
+- **Text Splitting**: LangChain RecursiveCharacterTextSplitter
+- **Embeddings**: HuggingFace `all-MiniLM-L6-v2`
+- **Vector Store**: FAISS
+- **LLM**: NVIDIA NIM API (`nemotron-3.5-lightning-30b-a3b`)
+
+## Setup
+
+1. Clone the repository
+2. Create a virtual environment:
+   ```bash
+   python -m venv .venv
+   .venv\Scripts\activate  # Windows
+   source .venv/bin/activate  # Linux/Mac
+   ```
+3. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+4. Create a `.env` file with your NVIDIA API key:
+   ```
+   NVIDIA_API_KEY=your_key_here
+   ```
+5. Run the app:
+   ```bash
+   streamlit run app.py
+   ```
+
+## Evaluation
+
+The project includes a RAGAS-based evaluation script (`evaluate.py`) with test cases (`test_questions.py`) designed to test:
+- Factual accuracy
+- Handling of contradicting information
+- Similar number confusion
+- Hallucination detection
+
+> Note: `evaluate.py` requires RAGAS API migration to work with the installed version.
+
+## Project Structure
+
+```
+├── app.py              # Main Streamlit application
+├── evaluate.py         # RAGAS evaluation script
+├── test_questions.py   # Test cases with ground truth
+├── test_document.pdf   # Sample document for testing
+├── requirements.txt    # Python dependencies
+└── .env                # API keys (not committed)
+```
