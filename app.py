@@ -31,14 +31,14 @@ def extract_and_chunk(uploaded_file):
         vector_store = FAISS.from_texts(all_chunks, embeddings, metadatas=all_metadatas)
         return vector_store
 
-NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY")
-if not NVIDIA_API_KEY:
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+if not GROQ_API_KEY:
     st.warning("API key issue")
     st.stop()
 else:
-    nim_client = OpenAI(
-    base_url="https://integrate.api.nvidia.com/v1",
-    api_key=os.getenv("NVIDIA_API_KEY")
+    llm_client = OpenAI(
+        base_url="https://api.groq.com/openai/v1",
+        api_key=GROQ_API_KEY
     )
 
 
@@ -82,7 +82,7 @@ def processing(question,style):
         Answer:"""
         results = None
     try:
-        stream = nim_client.chat.completions.create(model="nvidia/nemotron-3.5-lightning-30b-a3b", messages=[{"role": "user", "content": prompt}], temperature = style["temperature"], stream = True)
+        stream = llm_client.chat.completions.create(model="qwen/qwen3.8-27b", messages=[{"role": "user", "content": prompt}], temperature = style["temperature"], stream = True)
         with st.chat_message("assistant"):
             full_response = ""
             placeholder = st.empty()
